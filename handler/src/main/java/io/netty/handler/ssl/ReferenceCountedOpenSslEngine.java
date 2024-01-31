@@ -185,9 +185,6 @@ public class ReferenceCountedOpenSslEngine extends SSLEngine implements Referenc
 
     private volatile ClientAuth clientAuth = ClientAuth.NONE;
 
-    // Updated once a new handshake is started and so the SSLSession reused.
-    private volatile long lastAccessed = -1;
-
     private String endPointIdentificationAlgorithm;
     // Store as object as AlgorithmConstraints only exists since java 7.
     private Object algorithmConstraints;
@@ -1987,10 +1984,6 @@ public class ReferenceCountedOpenSslEngine extends SSLEngine implements Referenc
             sessionSet = true;
         }
 
-        if (lastAccessed == -1) {
-            lastAccessed = System.currentTimeMillis();
-        }
-
         int code = SSL.doHandshake(ssl);
         if (code <= 0) {
             int sslError = SSL.getError(ssl, code);
@@ -2369,7 +2362,11 @@ public class ReferenceCountedOpenSslEngine extends SSLEngine implements Referenc
         private String protocol;
         private String cipher;
         private OpenSslSessionId id = OpenSslSessionId.NULL_ID;
-        private volatile long creationTime;
+        private long creationTime;
+
+        // Updated once a new handshake is started and so the SSLSession reused.
+        private long lastAccessed = -1;
+
         private volatile int applicationBufferSize = MAX_PLAINTEXT_LENGTH;
         private volatile Certificate[] localCertificateChain;
         // lazy init for memory reasons
@@ -2385,10 +2382,12 @@ public class ReferenceCountedOpenSslEngine extends SSLEngine implements Referenc
 
         @Override
         public void setSessionId(OpenSslSessionId sessionId) {
+            long time = System.currentTimeMillis();
             synchronized (ReferenceCountedOpenSslEngine.this) {
                 if (this.id == OpenSslSessionId.NULL_ID) {
                     this.id = sessionId;
-                    creationTime = System.currentTimeMillis();
+                    creationTime = time;
+                    lastAccessed = time;
                 }
             }
         }
@@ -2431,9 +2430,10 @@ public class ReferenceCountedOpenSslEngine extends SSLEngine implements Referenc
 
         @Override
         public long getLastAccessedTime() {
-            long lastAccessed = ReferenceCountedOpenSslEngine.this.lastAccessed;
             // if lastAccessed is -1 we will just return the creation time as the handshake was not started yet.
-            return lastAccessed == -1 ? getCreationTime() : lastAccessed;
+            synchronized (ReferenceCountedOpenSslEngine.this) {
+                return lastAccessed == -1 ? creationTime : lastAccessed;
+            }
         }
 
         @Override
@@ -2528,7 +2528,10 @@ public class ReferenceCountedOpenSslEngine extends SSLEngine implements Referenc
                 throws SSLException {
             synchronized (ReferenceCountedOpenSslEngine.this) {
                 if (!isDestroyed()) {
+                    // Once the handshake was done the lastAccessed and creationTime should be the same.
                     this.creationTime = creationTime;
+                    lastAccessed = creationTime;
+
                     if (this.id == OpenSslSessionId.NULL_ID) {
                         this.id = id == null ? OpenSslSessionId.NULL_ID : new OpenSslSessionId(id);
                     }

@@ -3605,6 +3605,9 @@ public abstract class SSLEngineTest {
             assertTrue(clientSession.getLastAccessedTime() > 0);
             assertTrue(serverSession.getLastAccessedTime() > 0);
 
+            assertEquals(clientSession.getCreationTime(), clientSession.getLastAccessedTime());
+            assertEquals(serverSession.getCreationTime(), serverSession.getLastAccessedTime());
+
             assertEquals(param.combo().protocol, clientSession.getProtocol());
             assertEquals(param.combo().protocol, serverSession.getProtocol());
 
