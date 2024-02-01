@@ -55,15 +55,15 @@ final class OpenSslClientSessionCache extends OpenSslSessionCache {
     }
 
     @Override
-    void setSession(long ssl, String host, int port) {
+    void setSession(long ssl, OpenSslSession session, String host, int port) {
         HostPort hostPort = keyFor(host, port);
         if (hostPort == null) {
             return;
         }
-        final NativeSslSession session;
+        final NativeSslSession nativeSslSession;
         final boolean reused;
         synchronized (this) {
-            session = sessions.get(hostPort);
+            nativeSslSession = sessions.get(hostPort);
             if (session == null) {
                 return;
             }
@@ -73,15 +73,17 @@ final class OpenSslClientSessionCache extends OpenSslSessionCache {
             }
             // Try to set the session, if true is returned OpenSSL incremented the reference count
             // of the underlying SSL_SESSION*.
-            reused = SSL.setSession(ssl, session.session());
+            reused = SSL.setSession(ssl, nativeSslSession.session());
         }
 
         if (reused) {
-            if (session.shouldBeSingleUse()) {
+            if (nativeSslSession.shouldBeSingleUse()) {
                 // Should only be used once
                 session.invalidate();
             }
-            session.updateLastAccessedTime();
+            long current = System.currentTimeMillis();
+            nativeSslSession.setLastAccessedTime(current);
+            session.setLastAccessedTime(current);
         }
     }
 

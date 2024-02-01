@@ -114,6 +114,11 @@ abstract class ExtendedOpenSslSession extends ExtendedSSLSession implements Open
     }
 
     @Override
+    public void setLastAccessedTime(long time) {
+        wrapped.setLastAccessedTime(time);
+    }
+
+    @Override
     public final void invalidate() {
         wrapped.invalidate();
     }

@@ -50,6 +50,8 @@ import io.netty.util.internal.PlatformDependent;
 import io.netty.util.internal.StringUtil;
 import io.netty.util.internal.SystemPropertyUtil;
 import org.conscrypt.OpenSSLProvider;
+import org.hamcrest.MatcherAssert;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -127,6 +129,7 @@ import javax.net.ssl.X509TrustManager;
 import javax.security.cert.X509Certificate;
 
 import static io.netty.handler.ssl.SslUtils.*;
+import static org.hamcrest.CoreMatchers.is;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -3291,7 +3294,10 @@ public abstract class SSLEngineTest {
             }
 
             assertSessionReusedForEngine(clientEngine, serverEngine, reuse);
-
+            if (reuse) {
+                //MatcherAssert.assertThat(clientEngine.getSession().getLastAccessedTime(),
+                //        is(Matchers.greaterThan(clientEngine.getSession().getCreationTime())));
+            }
             closeOutboundAndInbound(param.type(), clientEngine, serverEngine);
         } finally {
             cleanupClientSslEngine(clientEngine);

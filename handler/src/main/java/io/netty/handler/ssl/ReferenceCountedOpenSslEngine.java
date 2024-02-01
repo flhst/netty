@@ -1980,7 +1980,7 @@ public class ReferenceCountedOpenSslEngine extends SSLEngine implements Referenc
         engineMap.add(this);
 
         if (!sessionSet) {
-            parentContext.sessionContext().setSessionFromCache(getPeerHost(), getPeerPort(), ssl);
+            parentContext.sessionContext().setSessionFromCache(ssl, session, getPeerHost(), getPeerPort());
             sessionSet = true;
         }
 
@@ -2425,6 +2425,13 @@ public class ReferenceCountedOpenSslEngine extends SSLEngine implements Referenc
         public long getCreationTime() {
             synchronized (ReferenceCountedOpenSslEngine.this) {
                 return creationTime;
+            }
+        }
+
+        @Override
+        public void setLastAccessedTime(long time) {
+            synchronized (ReferenceCountedOpenSslEngine.this) {
+                this.lastAccessed = time;
             }
         }
 

@@ -203,11 +203,18 @@ class OpenSslSessionCache implements SSLSessionCache {
                 removeSessionWithId(session.sessionId());
             }
         }
-        session.updateLastAccessedTime();
+        long current = System.currentTimeMillis();
+        session.setLastAccessedTime(current);
+        ReferenceCountedOpenSslEngine engine = engineMap.get(ssl);
+        if (engine != null) {
+            // We couldn't find the engine itself.
+            ((OpenSslSession) engine.getSession()).setLastAccessedTime(current);
+        }
+
         return session.session();
     }
 
-    void setSession(long ssl, String host, int port) {
+    void setSession(long ssl, OpenSslSession session, String host, int port) {
         // Do nothing by default as this needs special handling for the client side.
     }
 
@@ -378,8 +385,9 @@ class OpenSslSessionCache implements SSLSessionCache {
             return creationTime;
         }
 
-        void updateLastAccessedTime() {
-            lastAccessedTime = System.currentTimeMillis();
+        @Override
+        public void setLastAccessedTime(long time) {
+            lastAccessedTime = time;
         }
 
         @Override

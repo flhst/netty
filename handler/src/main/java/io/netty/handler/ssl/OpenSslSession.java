@@ -43,6 +43,8 @@ interface OpenSslSession extends SSLSession {
      */
     void setSessionId(OpenSslSessionId id);
 
+    void setLastAccessedTime(long time);
+
     @Override
     OpenSslSessionContext getSessionContext();
 
