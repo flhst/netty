@@ -31,6 +31,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -141,7 +142,7 @@ class OpenSslSessionCache implements SSLSessionCache {
     }
 
     @Override
-    public final boolean sessionCreated(long ssl, long sslSession) {
+    public boolean sessionCreated(long ssl, long sslSession) {
         ReferenceCountedOpenSslEngine engine = engineMap.get(ssl);
         if (engine == null) {
             // We couldn't find the engine itself.
@@ -149,7 +150,8 @@ class OpenSslSessionCache implements SSLSessionCache {
         }
         NativeSslSession session = new NativeSslSession(sslSession, engine.getPeerHost(), engine.getPeerPort(),
                 getSessionTimeout() * 1000L);
-        engine.setSessionId(session.sessionId());
+        ((OpenSslSession) engine.getSession()).setSessionDetails(
+                session.creationTime, session.sessionId(), session.keyValueStorage);
         synchronized (this) {
             // Mimic what OpenSSL is doing and expunge every 255 new sessions
             // See https://www.openssl.org/docs/man1.0.2/man3/SSL_CTX_flush_sessions.html
@@ -164,7 +166,6 @@ class OpenSslSessionCache implements SSLSessionCache {
                 session.close();
                 return false;
             }
-
             final NativeSslSession old = sessions.put(session.sessionId(), session);
             if (old != null) {
                 notifyRemovalAndFree(old);
@@ -207,8 +208,8 @@ class OpenSslSessionCache implements SSLSessionCache {
         session.setLastAccessedTime(current);
         ReferenceCountedOpenSslEngine engine = engineMap.get(ssl);
         if (engine != null) {
-            // We couldn't find the engine itself.
-            ((OpenSslSession) engine.getSession()).setLastAccessedTime(current);
+            OpenSslSession sslSession = (OpenSslSession) engine.getSession();
+            sslSession.setSessionDetails(current, session.sessionId(), session.keyValueStorage);
         }
 
         return session.session();
@@ -292,6 +293,9 @@ class OpenSslSessionCache implements SSLSessionCache {
         static final ResourceLeakDetector<NativeSslSession> LEAK_DETECTOR = ResourceLeakDetectorFactory.instance()
                 .newResourceLeakDetector(NativeSslSession.class);
         private final ResourceLeakTracker<NativeSslSession> leakTracker;
+
+        final Map<String, Object> keyValueStorage = new ConcurrentHashMap<String, Object>();
+
         private final long session;
         private final String peerHost;
         private final int peerPort;
@@ -312,7 +316,7 @@ class OpenSslSessionCache implements SSLSessionCache {
         }
 
         @Override
-        public void setSessionId(OpenSslSessionId id) {
+        public void setSessionDetails(long time, OpenSslSessionId id, Map<String, Object> keyValueStorage) {
             throw new UnsupportedOperationException();
         }
 

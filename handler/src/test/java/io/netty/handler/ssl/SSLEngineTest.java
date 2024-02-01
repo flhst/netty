@@ -258,6 +258,15 @@ public abstract class SSLEngineTest {
         final List<String> ciphers() {
             return Collections.singletonList(protocolCipherCombo.cipher);
         }
+
+        @Override
+        public String toString() {
+            return "SslEngineTestParam{" +
+                    "type=" + type() +
+                    ", protocolCipherCombo=" + combo() +
+                    ", delegate=" + delegate() +
+                    '}';
+        }
     }
 
     protected List<SSLEngineTestParam> newTestParams() {
@@ -3294,9 +3303,11 @@ public abstract class SSLEngineTest {
             }
 
             assertSessionReusedForEngine(clientEngine, serverEngine, reuse);
+            String key = "key";
             if (reuse) {
-                //MatcherAssert.assertThat(clientEngine.getSession().getLastAccessedTime(),
-                //        is(Matchers.greaterThan(clientEngine.getSession().getCreationTime())));
+                assertEquals(Boolean.TRUE, clientEngine.getSession().getValue(key));
+            } else {
+                clientEngine.getSession().putValue(key, Boolean.TRUE);
             }
             closeOutboundAndInbound(param.type(), clientEngine, serverEngine);
         } finally {
@@ -3591,11 +3602,21 @@ public abstract class SSLEngineTest {
                                      .build());
         SSLEngine clientEngine = null;
         SSLEngine serverEngine = null;
+        String key = "key";
         try {
             clientEngine = wrapEngine(clientSslCtx.newEngine(UnpooledByteBufAllocator.DEFAULT));
             serverEngine = wrapEngine(serverSslCtx.newEngine(UnpooledByteBufAllocator.DEFAULT));
 
+            clientEngine.getSession().putValue(key, Boolean.TRUE);
+            assertEquals(Boolean.TRUE, clientEngine.getSession().getValue(key));
+            serverEngine.getSession().putValue(key, Boolean.TRUE);
+            assertEquals(Boolean.TRUE, serverEngine.getSession().getValue(key));
+
             handshake(param.type(), param.delegate(), clientEngine, serverEngine);
+
+            // The values are not carried over.
+            assertNull(clientEngine.getSession().getValue(key));
+            assertNull(serverEngine.getSession().getValue(key));
 
             SSLSession clientSession = clientEngine.getSession();
             SSLSession serverSession = serverEngine.getSession();

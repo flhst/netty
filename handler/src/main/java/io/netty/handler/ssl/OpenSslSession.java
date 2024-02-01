@@ -15,15 +15,13 @@
  */
 package io.netty.handler.ssl;
 
-import io.netty.util.ReferenceCounted;
-
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSession;
 import java.security.cert.Certificate;
+import java.util.Map;
 
 /**
- * {@link SSLSession} that is specific to our native implementation and {@link ReferenceCounted} to track native
- * resources.
+ * {@link SSLSession} that is specific to our native implementation.
  */
 interface OpenSslSession extends SSLSession {
 
@@ -41,8 +39,13 @@ interface OpenSslSession extends SSLSession {
     /**
      * Set the {@link OpenSslSessionId} for the {@link OpenSslSession}.
      */
-    void setSessionId(OpenSslSessionId id);
+    void setSessionDetails(long lastUpdated, OpenSslSessionId id, Map<String, Object> keyValueStorage);
 
+    /**
+     * Set the last access time which will be returned by {@link #getLastAccessedTime()}.
+     *
+     * @param time the time
+     */
     void setLastAccessedTime(long time);
 
     @Override

@@ -34,6 +34,11 @@ final class OpenSslClientSessionCache extends OpenSslSessionCache {
     }
 
     @Override
+    public boolean sessionCreated(long ssl, long sslSession) {
+        return super.sessionCreated(ssl, sslSession);
+    }
+
+    @Override
     protected boolean sessionCreated(NativeSslSession session) {
         assert Thread.holdsLock(this);
         HostPort hostPort = keyFor(session.getPeerHost(), session.getPeerPort());
@@ -64,11 +69,11 @@ final class OpenSslClientSessionCache extends OpenSslSessionCache {
         final boolean reused;
         synchronized (this) {
             nativeSslSession = sessions.get(hostPort);
-            if (session == null) {
+            if (nativeSslSession == null) {
                 return;
             }
-            if (!session.isValid()) {
-                removeSessionWithId(session.sessionId());
+            if (!nativeSslSession.isValid()) {
+                removeSessionWithId(nativeSslSession.sessionId());
                 return;
             }
             // Try to set the session, if true is returned OpenSSL incremented the reference count
@@ -79,11 +84,12 @@ final class OpenSslClientSessionCache extends OpenSslSessionCache {
         if (reused) {
             if (nativeSslSession.shouldBeSingleUse()) {
                 // Should only be used once
+                nativeSslSession.invalidate();
                 session.invalidate();
             }
             long current = System.currentTimeMillis();
             nativeSslSession.setLastAccessedTime(current);
-            session.setLastAccessedTime(current);
+            session.setSessionDetails(current, nativeSslSession.sessionId(), nativeSslSession.keyValueStorage);
         }
     }
 
