@@ -96,6 +96,7 @@ import javax.net.ssl.X509ExtendedTrustManager;
 import static io.netty.buffer.Unpooled.wrappedBuffer;
 import static org.hamcrest.CoreMatchers.*;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -1348,6 +1349,8 @@ public class SslHandlerTest {
                                             // First should not re-use the session
                                             try {
                                                 assertEquals(handshakeCount > 1, engine.isSessionReused());
+                                                assertThat(engine.getSession().getLastAccessedTime(),
+                                                        greaterThan(engine.getSession().getCreationTime()));
                                             } catch (AssertionError error) {
                                                 assertErrorRef.set(error);
                                                 return;

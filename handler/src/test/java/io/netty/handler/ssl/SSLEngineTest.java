@@ -50,8 +50,7 @@ import io.netty.util.internal.PlatformDependent;
 import io.netty.util.internal.StringUtil;
 import io.netty.util.internal.SystemPropertyUtil;
 import org.conscrypt.OpenSSLProvider;
-import org.hamcrest.MatcherAssert;
-import org.hamcrest.Matchers;
+import org.hamcrest.Matcher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -130,6 +129,9 @@ import javax.security.cert.X509Certificate;
 
 import static io.netty.handler.ssl.SslUtils.*;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -3253,8 +3255,8 @@ public abstract class SSLEngineTest {
             int serverSessions = currentSessionCacheSize(serverSslCtx.sessionContext());
             int nCSessions = clientSessions;
             int nSSessions = serverSessions;
-            boolean clientSessionReused = false;
-            boolean serverSessionReused = false;
+            SessionReusedState clientSessionReused = SessionReusedState.NOT_REUSED;
+            SessionReusedState serverSessionReused = SessionReusedState.NOT_REUSED;
             if (param.protocolCipherCombo == ProtocolCipherCombo.TLSV13) {
                 // Allocate something which is big enough for sure
                 ByteBuffer packetBuffer = allocateBuffer(param.type(), 32 * 1024);
@@ -3294,9 +3296,10 @@ public abstract class SSLEngineTest {
                     appBuffer.clear().position(4).flip();
                     nCSessions = currentSessionCacheSize(clientSslCtx.sessionContext());
                     nSSessions = currentSessionCacheSize(serverSslCtx.sessionContext());
-                    clientSessionReused = isSessionMaybeReused(clientEngine);
-                    serverSessionReused = isSessionMaybeReused(serverEngine);
-                } while ((reuse && (!clientSessionReused || !serverSessionReused))
+                    clientSessionReused = isSessionReused(clientEngine);
+                    serverSessionReused = isSessionReused(serverEngine);
+                } while ((reuse && (clientSessionReused == SessionReusedState.NOT_REUSED ||
+                        serverSessionReused == SessionReusedState.NOT_REUSED))
                         || (!reuse && (nCSessions < clientSessions ||
                         // server may use multiple sessions
                         nSSessions < serverSessions)));
@@ -3305,13 +3308,29 @@ public abstract class SSLEngineTest {
             assertSessionReusedForEngine(clientEngine, serverEngine, reuse);
             String key = "key";
             if (reuse) {
-                // We should see the previous stored value on session reuse.
-                // This is broken in conscrypt.
-                // TODO: Open an issue in the conscrypt project.
-                if (!Conscrypt.isEngineSupported(clientEngine)) {
-                    assertEquals(Boolean.TRUE, clientEngine.getSession().getValue(key));
+                if (clientSessionReused != SessionReusedState.NOT_REUSED) {
+                    // We should see the previous stored value on session reuse.
+                    // This is broken in conscrypt.
+                    // TODO: Open an issue in the conscrypt project.
+                    if (!Conscrypt.isEngineSupported(clientEngine)) {
+                        assertEquals(Boolean.TRUE, clientEngine.getSession().getValue(key));
+                    }
+
+                    Matcher<Long> creationTimeMatcher;
+                    if (clientSessionReused == SessionReusedState.REUSED) {
+                        // If we know for sure it was reused so the accessedTime needs to be larger.
+                        creationTimeMatcher = greaterThan(clientEngine.getSession().getCreationTime());
+                    } else {
+                        creationTimeMatcher = greaterThanOrEqualTo(clientEngine.getSession().getCreationTime());
+                    }
+                    assertThat(clientEngine.getSession().getLastAccessedTime(),
+                            is(creationTimeMatcher));
                 }
             } else {
+                // Ensure we sleep 1ms in between as getLastAccessedTime() abd getCreationTime() are in milliseconds.
+                // If we don't sleep and execution is very fast we will see test-failures once we go into the
+                // reuse branch.
+                Thread.sleep(1);
                 clientEngine.getSession().putValue(key, Boolean.TRUE);
             }
             closeOutboundAndInbound(param.type(), clientEngine, serverEngine);
@@ -3321,8 +3340,25 @@ public abstract class SSLEngineTest {
         }
     }
 
-    protected boolean isSessionMaybeReused(SSLEngine engine) {
-        return true;
+    protected enum SessionReusedState {
+        /**
+         * We know for sure that the session was not reused
+         */
+        NOT_REUSED,
+
+        /**
+         * The session might have been reused.
+         */
+        MAYBE_REUSED,
+
+        /**
+         * The session was reused.
+         */
+        REUSED;
+    }
+
+    protected SessionReusedState isSessionReused(SSLEngine engine) {
+        return SessionReusedState.MAYBE_REUSED;
     }
 
     private static int currentSessionCacheSize(SSLSessionContext ctx) {

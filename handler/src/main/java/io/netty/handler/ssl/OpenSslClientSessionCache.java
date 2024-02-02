@@ -34,11 +34,6 @@ final class OpenSslClientSessionCache extends OpenSslSessionCache {
     }
 
     @Override
-    public boolean sessionCreated(long ssl, long sslSession) {
-        return super.sessionCreated(ssl, sslSession);
-    }
-
-    @Override
     protected boolean sessionCreated(NativeSslSession session) {
         assert Thread.holdsLock(this);
         HostPort hostPort = keyFor(session.getPeerHost(), session.getPeerPort());
@@ -67,6 +62,7 @@ final class OpenSslClientSessionCache extends OpenSslSessionCache {
         }
         final NativeSslSession nativeSslSession;
         final boolean reused;
+        boolean singleUsed = false;
         synchronized (this) {
             nativeSslSession = sessions.get(hostPort);
             if (nativeSslSession == null) {
@@ -79,17 +75,21 @@ final class OpenSslClientSessionCache extends OpenSslSessionCache {
             // Try to set the session, if true is returned OpenSSL incremented the reference count
             // of the underlying SSL_SESSION*.
             reused = SSL.setSession(ssl, nativeSslSession.session());
+            if (reused) {
+                singleUsed = nativeSslSession.shouldBeSingleUse();
+            }
         }
 
         if (reused) {
-            if (nativeSslSession.shouldBeSingleUse()) {
+            if (singleUsed) {
                 // Should only be used once
                 nativeSslSession.invalidate();
                 session.invalidate();
             }
-            long current = System.currentTimeMillis();
-            nativeSslSession.setLastAccessedTime(current);
-            session.setSessionDetails(current, nativeSslSession.sessionId(), nativeSslSession.keyValueStorage);
+            nativeSslSession.setLastAccessedTime(System.currentTimeMillis());
+            session.setSessionDetails(nativeSslSession.getCreationTime(), nativeSslSession.getLastAccessedTime(),
+                    nativeSslSession.sessionId(), nativeSslSession.keyValueStorage);
+
         }
     }
 

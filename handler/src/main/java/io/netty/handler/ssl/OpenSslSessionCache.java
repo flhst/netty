@@ -151,7 +151,7 @@ class OpenSslSessionCache implements SSLSessionCache {
         NativeSslSession session = new NativeSslSession(sslSession, engine.getPeerHost(), engine.getPeerPort(),
                 getSessionTimeout() * 1000L);
         ((OpenSslSession) engine.getSession()).setSessionDetails(
-                session.creationTime, session.sessionId(), session.keyValueStorage);
+                session.creationTime, session.lastAccessedTime, session.sessionId(), session.keyValueStorage);
         synchronized (this) {
             // Mimic what OpenSSL is doing and expunge every 255 new sessions
             // See https://www.openssl.org/docs/man1.0.2/man3/SSL_CTX_flush_sessions.html
@@ -204,12 +204,12 @@ class OpenSslSessionCache implements SSLSessionCache {
                 removeSessionWithId(session.sessionId());
             }
         }
-        long current = System.currentTimeMillis();
-        session.setLastAccessedTime(current);
+        session.setLastAccessedTime(System.currentTimeMillis());
         ReferenceCountedOpenSslEngine engine = engineMap.get(ssl);
         if (engine != null) {
             OpenSslSession sslSession = (OpenSslSession) engine.getSession();
-            sslSession.setSessionDetails(current, session.sessionId(), session.keyValueStorage);
+            sslSession.setSessionDetails(session.getCreationTime(),
+                    session.getLastAccessedTime(), session.sessionId(), session.keyValueStorage);
         }
 
         return session.session();
@@ -316,7 +316,8 @@ class OpenSslSessionCache implements SSLSessionCache {
         }
 
         @Override
-        public void setSessionDetails(long time, OpenSslSessionId id, Map<String, Object> keyValueStorage) {
+        public void setSessionDetails(long creationTime, long lastAccessedTime,
+                                      OpenSslSessionId id, Map<String, Object> keyValueStorage) {
             throw new UnsupportedOperationException();
         }
 

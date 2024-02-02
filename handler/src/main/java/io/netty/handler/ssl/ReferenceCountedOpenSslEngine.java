@@ -2377,11 +2377,12 @@ public class ReferenceCountedOpenSslEngine extends SSLEngine implements Referenc
 
         @Override
         public void setSessionDetails(
-                long lastUpdated, OpenSslSessionId sessionId, Map<String, Object> keyValueStorage) {
+                long creationTime, long lastUpdated, OpenSslSessionId sessionId,
+                Map<String, Object> keyValueStorage) {
             synchronized (ReferenceCountedOpenSslEngine.this) {
                 if (this.id == OpenSslSessionId.NULL_ID) {
                     this.id = sessionId;
-                    creationTime = lastUpdated;
+                    this.creationTime = creationTime;
                     lastAccessed = lastUpdated;
                     // Update the key value storage. It's fine to just drop the previous stored values on the floor
                     // as the JDK does the same in the sense that it will use a new SSLSessionImpl instance once the
@@ -2534,15 +2535,14 @@ public class ReferenceCountedOpenSslEngine extends SSLEngine implements Referenc
                 throws SSLException {
             synchronized (ReferenceCountedOpenSslEngine.this) {
                 if (!isDestroyed()) {
-                    // Once the handshake was done the lastAccessed and creationTime should be the same.
-                    this.creationTime = creationTime;
-                    lastAccessed = creationTime;
-
                     if (this.id == OpenSslSessionId.NULL_ID) {
                         // if the handshake finished and it was not a resumption let ensure we try to set the id
                         // and also clear the key value pairs.
                         this.id = id == null ? OpenSslSessionId.NULL_ID : new OpenSslSessionId(id);
                         keyValueStorage = null;
+                        // Once the handshake was done the lastAccessed and creationTime should be the same if we
+                        // did not set it earlier via setSessionDetails(...)
+                        this.creationTime = lastAccessed = creationTime;
                     }
                     this.cipher = toJavaCipherSuite(cipher);
                     this.protocol = protocol;
