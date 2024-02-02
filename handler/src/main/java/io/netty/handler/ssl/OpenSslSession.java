@@ -39,7 +39,8 @@ interface OpenSslSession extends SSLSession {
     /**
      * Set the {@link OpenSslSessionId} for the {@link OpenSslSession}.
      */
-    void setSessionDetails(long creationTime, long lastUpdated, OpenSslSessionId id, Map<String, Object> keyValueStorage);
+    void setSessionDetails(long creationTime, long lastUpdated,
+                           OpenSslSessionId id, Map<String, Object> keyValueStorage);
 
     /**
      * Set the last access time which will be returned by {@link #getLastAccessedTime()}.
