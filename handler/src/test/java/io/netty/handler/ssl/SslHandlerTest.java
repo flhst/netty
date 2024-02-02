@@ -1349,8 +1349,10 @@ public class SslHandlerTest {
                                             // First should not re-use the session
                                             try {
                                                 assertEquals(handshakeCount > 1, engine.isSessionReused());
-                                                assertThat(engine.getSession().getLastAccessedTime(),
-                                                        greaterThan(engine.getSession().getCreationTime()));
+                                                if (engine.isSessionReused()) {
+                                                    assertThat(engine.getSession().getLastAccessedTime(),
+                                                            greaterThan(engine.getSession().getCreationTime()));
+                                                }
                                             } catch (AssertionError error) {
                                                 assertErrorRef.set(error);
                                                 return;
@@ -1423,6 +1425,10 @@ public class SslHandlerTest {
             // See https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_sess_set_get_cb.html
             if (!SslProtocols.TLS_v1_3.equals(engine.getSession().getProtocol())) {
                 assertEquals(isReused, engine.isSessionReused());
+                if (engine.isSessionReused()) {
+                    assertThat(engine.getSession().getLastAccessedTime(),
+                            greaterThan(engine.getSession().getCreationTime()));
+                }
             }
             Object obj = queue.take();
             if (obj instanceof ByteBuf) {
